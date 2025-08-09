@@ -20,8 +20,10 @@ Soldier soldier_new(float x, float y, float facing) {
                    .attack_clock = 0.0,
                    .x = x,
                    .y = y,
+                   .speed = 80,
                    .facing_angle = facing,
                    .vision_angle = M_PI_4,
+                   .vision_range = 600.0,
                    .range = 200.0};
 }
 
@@ -39,6 +41,19 @@ bool in_soldier_attack_cone(const Soldier *soldier, float x, float y) {
            ((vf0 <= angle && angle < 2 * M_PI) || (0 <= angle && angle <= vf1));
   } else {
     return dist <= soldier->range && vf0 <= angle && angle <= vf1;
+  }
+}
+
+void soldier_approach_target(Soldier *soldier, const Soldier *target,
+                             double delta) {
+  float dy = target->y - soldier->y, dx = target->x - soldier->x;
+  float dist = sqrtf(dx * dx + dy * dy);
+  float margin = 5;
+
+  if (dist > target->range - margin) {
+    soldier->x += (dx / dist) * soldier->speed * delta;
+    soldier->y += (dy / dist) * soldier->speed * delta;
+    soldier->facing_angle = atan2f(dy, dx);
   }
 }
 
@@ -82,6 +97,14 @@ void warfield_run_tick(Warfield *field, double delta) {
         }
       } else {
         field->soldiers[i].attack_clock += delta;
+      }
+
+      float disty = field->soldiers[j].y - field->soldiers[i].y,
+            distx = field->soldiers[j].x - field->soldiers[i].x;
+      float dist = sqrtf(distx * distx + disty * disty);
+      if (dist <= field->soldiers[i].vision_range) {
+        soldier_approach_target(&field->soldiers[i], &field->soldiers[j],
+                                delta);
       }
     }
   }

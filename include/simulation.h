@@ -10,13 +10,17 @@ typedef struct {
   float attack_cooldown;
   float attack_clock;
   float x, y;
+  float speed;
   float facing_angle;
   float vision_angle;
+  float vision_range;
   float range;
 } Soldier;
 
 Soldier soldier_new(float x, float y, float facing);
 bool in_soldier_attack_cone(const Soldier *soldier, float x, float y);
+void soldier_approach_target(Soldier *soldier, const Soldier *target,
+                             double delta);
 
 typedef struct {
   Soldier *soldiers;

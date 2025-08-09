@@ -51,12 +51,29 @@ void RSDL_DrawCone(SDL_Renderer *renderer, float cx, float cy,
 
 GameState gamestate_new(void) {
   Warfield field = warfield_new();
-  warfield_append_soldier(&field, soldier_new(50, 200, 0));
-  warfield_append_soldier(&field, soldier_new(200, 200, M_PI));
-  return (GameState){.field = field};
+  warfield_append_soldier(&field, soldier_new(100, 50, 0));
+  warfield_append_soldier(&field, soldier_new(500, 200, M_PI));
+  Camera camera = camera_new(0, 0);
+  float mx, my;
+  SDL_GetMouseState(&mx, &my);
+  return (GameState){
+      .field = field, .camera = camera, .mouse_last_x = mx, .mouse_last_y = my};
 }
 
 void gamestate_free(GameState *state) { warfield_free(&state->field); }
+
+Camera camera_new(float x, float y) {
+  return (Camera){.x = x, .y = y, .speed = 200};
+}
+
+void camera_displace(Camera *camera, float x, float y) {
+  camera->x += x;
+  camera->y += y;
+}
+
+float worldx(const Camera *camera, float x) { return x - camera->x; }
+
+float worldy(const Camera *camera, float y) { return y - camera->y; }
 
 void renderer_events(const RenderTarget *target, const SDL_Event *event,
                      GameState *state) {
@@ -70,6 +87,16 @@ void renderer_events(const RenderTarget *target, const SDL_Event *event,
 void renderer_update(const RenderTarget *target, GameState *state,
                      double delta) {
   warfield_run_tick(&state->field, delta);
+  float mx, my;
+  bool is_reversed = true;
+  SDL_MouseButtonFlags mstate = SDL_GetMouseState(&mx, &my);
+  if (mstate & SDL_BUTTON_MMASK) {
+    float sign = is_reversed ? -1 : 1;
+    camera_displace(&state->camera, sign * (mx - state->mouse_last_x),
+                    sign * (my - state->mouse_last_y));
+  }
+  state->mouse_last_x = mx;
+  state->mouse_last_y = my;
 }
 
 void renderer_draw(const RenderTarget *target, const GameState *state) {
@@ -81,8 +108,8 @@ void renderer_draw(const RenderTarget *target, const GameState *state) {
 
     int soldier_size = 30;
     // Top-left
-    float tlx = sold->x - (float)soldier_size / 2,
-          tly = sold->y - (float)soldier_size / 2;
+    float tlx = worldx(&state->camera, sold->x - (float)soldier_size / 2),
+          tly = worldy(&state->camera, sold->y - (float)soldier_size / 2);
     SDL_FRect rect = {.x = tlx, .y = tly, .w = soldier_size, .h = soldier_size};
     SDL_SetRenderDrawColor(target->rdr, 0xFF, 0x00, 0x00, SDL_ALPHA_OPAQUE);
     SDL_RenderFillRect(target->rdr, &rect);
@@ -95,7 +122,8 @@ void renderer_draw(const RenderTarget *target, const GameState *state) {
     float range_mult = (1 - attack_progress / 2);
     float d_angle = sold->vision_angle * range_mult;
     SDL_SetRenderDrawColor(target->rdr, 0x00, 0x00, 0xFF, 0x20);
-    RSDL_DrawCone(target->rdr, sold->x, sold->y, sold->facing_angle - d_angle,
+    RSDL_DrawCone(target->rdr, worldx(&state->camera, sold->x),
+                  worldy(&state->camera, sold->y), sold->facing_angle - d_angle,
                   sold->facing_angle + d_angle, sold->range);
 
     SDL_FRect hp_back = {.x = tlx, tly - 15, .w = soldier_size, .h = 10};

@@ -3,7 +3,19 @@
 #include "simulation.h"
 
 typedef struct {
+  float x, y;
+  float speed;
+} Camera;
+
+Camera camera_new(float x, float y);
+void camera_displace(Camera *camera, float x, float y);
+float worldx(const Camera *camera, float x);
+float worldy(const Camera *camera, float y);
+
+typedef struct {
   Warfield field;
+  Camera camera;
+  float mouse_last_x, mouse_last_y;
 } GameState;
 
 GameState gamestate_new(void);
