@@ -154,13 +154,13 @@ void warfield_spawn(Warfield *field) {
   Soldier **queue_cursor = field->spawn_queue;
   Soldier **queue_end = field->spawn_queue + field->spawn_queue_count;
   for (size_t i = 0; i < field->soldiers_count; ++i) {
+    if (queue_cursor >= queue_end)
+      break;
     if (field->soldiers[i]->is_dead) {
       soldier_free(field->soldiers[i]);
       field->soldiers[i] = *queue_cursor;
       queue_cursor += 1;
     }
-    if (queue_cursor >= queue_end)
-      break;
   }
 
   int i = 0;
