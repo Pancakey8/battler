@@ -1,4 +1,5 @@
 #include "simulation.h"
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,20 +13,26 @@ float angle_norm(float angle) {
   return angle;
 }
 
-Soldier soldier_new(float x, float y, float facing) {
-  return (Soldier){.health = 100,
-                   .max_health = 100,
-                   .damage = 5,
-                   .attack_cooldown = 2.0,
-                   .attack_clock = 0.0,
-                   .x = x,
-                   .y = y,
-                   .speed = 80,
-                   .facing_angle = facing,
-                   .vision_angle = M_PI_4,
-                   .vision_range = 600.0,
-                   .range = 200.0};
+Soldier *soldier_new(float x, float y, float facing) {
+  Soldier *sold = malloc(sizeof(Soldier));
+  *sold = (Soldier){.health = 100,
+                    .max_health = 100,
+                    .is_dead = false,
+                    .damage = 10,
+                    .attack_cooldown = 1.5,
+                    .attack_clock = 0.0,
+                    .x = x,
+                    .y = y,
+                    .speed = 80,
+                    .facing_angle = facing,
+                    .vision_angle = M_PI_4,
+                    .vision_range = 600.0,
+                    .range = 200.0,
+                    .target = NULL};
+  return sold;
 }
+
+void soldier_free(Soldier *soldier) { free(soldier); }
 
 // Consider facing +- vision
 bool in_soldier_attack_cone(const Soldier *soldier, float x, float y) {
@@ -44,21 +51,29 @@ bool in_soldier_attack_cone(const Soldier *soldier, float x, float y) {
   }
 }
 
-void soldier_approach_target(Soldier *soldier, const Soldier *target,
-                             double delta) {
-  float dy = target->y - soldier->y, dx = target->x - soldier->x;
-  float dist = sqrtf(dx * dx + dy * dy);
-  float margin = 5;
+void soldier_chase_target(Soldier *soldier, double delta) {
+  if (soldier->target == NULL)
+    return;
 
-  if (dist > target->range - margin) {
+  if (in_soldier_attack_cone(soldier, soldier->target->x, soldier->target->y)) {
+    if (soldier->attack_clock >= soldier->attack_cooldown) {
+      soldier->attack_clock = 0;
+      soldier->target->health -= soldier->damage;
+    } else {
+      soldier->attack_clock += delta;
+    }
+  } else {
+    float dx = soldier->target->x - soldier->x,
+          dy = soldier->target->y - soldier->y;
+    float dist = sqrtf(dx * dx + dy * dy);
     soldier->x += (dx / dist) * soldier->speed * delta;
     soldier->y += (dy / dist) * soldier->speed * delta;
-    soldier->facing_angle = atan2f(dy, dx);
+    soldier->facing_angle = angle_norm(atan2f(dy, dx));
   }
 }
 
 Warfield warfield_new(void) {
-  return (Warfield){.soldiers = calloc(50, sizeof(Soldier)),
+  return (Warfield){.soldiers = calloc(50, sizeof(Soldier *)),
                     .soldiers_count = 0,
                     .soldiers_size = 50};
 }
@@ -70,11 +85,19 @@ void warfield_resize(Warfield *field, size_t N) {
     exit(1);
   }
 
-  field->soldiers = realloc(field->soldiers, N * sizeof(Soldier));
+  field->soldiers = realloc(field->soldiers, N * sizeof(Soldier *));
   field->soldiers_size = N;
 }
 
-void warfield_append_soldier(Warfield *field, Soldier soldier) {
+void warfield_append_soldier(Warfield *field, Soldier *soldier) {
+  for (size_t i = 0; i < field->soldiers_count; ++i) {
+    if (field->soldiers[i]->is_dead) {
+      soldier_free(field->soldiers[i]);
+      field->soldiers[i] = soldier;
+      return;
+    }
+  }
+
   if (field->soldiers_count == field->soldiers_size) {
     warfield_resize(field, field->soldiers_size + 50);
   }
@@ -85,33 +108,41 @@ void warfield_append_soldier(Warfield *field, Soldier soldier) {
 
 void warfield_run_tick(Warfield *field, double delta) {
   for (size_t i = 0; i < field->soldiers_count; ++i) {
-    for (size_t j = 0; j < field->soldiers_count; ++j) {
-      if (i == j)
-        continue;
-      if (field->soldiers[i].attack_clock >=
-          field->soldiers[i].attack_cooldown) {
-        if (in_soldier_attack_cone(&field->soldiers[i], field->soldiers[j].x,
-                                   field->soldiers[j].y)) {
-          field->soldiers[j].health -= field->soldiers[i].damage;
-          field->soldiers[i].attack_clock = 0.0;
-        }
-      } else {
-        field->soldiers[i].attack_clock += delta;
-      }
+    if (field->soldiers[i]->is_dead) {
+      continue;
+    } else if (field->soldiers[i]->health <= 0) {
+      field->soldiers[i]->is_dead = true;
+      continue;
+    }
 
-      float disty = field->soldiers[j].y - field->soldiers[i].y,
-            distx = field->soldiers[j].x - field->soldiers[i].x;
-      float dist = sqrtf(distx * distx + disty * disty);
-      if (dist <= field->soldiers[i].vision_range) {
-        soldier_approach_target(&field->soldiers[i], &field->soldiers[j],
-                                delta);
-        break;
+    if (field->soldiers[i]->target != NULL &&
+        field->soldiers[i]->target->is_dead) {
+      field->soldiers[i]->target = NULL;
+    }
+
+    if (field->soldiers[i]->target == NULL) {
+      float min_dist = FLT_MAX;
+      for (size_t j = 0; j < field->soldiers_count; ++j) {
+        if (i == j || field->soldiers[j]->is_dead)
+          continue;
+        float dx = field->soldiers[j]->x - field->soldiers[i]->x,
+              dy = field->soldiers[j]->y - field->soldiers[i]->y;
+        float dist = sqrtf(dx * dx + dy * dy);
+        if (dist < min_dist) {
+          min_dist = dist;
+          field->soldiers[i]->target = field->soldiers[j];
+        }
       }
+    } else {
+      soldier_chase_target(field->soldiers[i], delta);
     }
   }
 }
 
 void warfield_free(Warfield *field) {
+  for (size_t i = 0; i < field->soldiers_count; ++i) {
+    soldier_free(field->soldiers[i]);
+  }
   free(field->soldiers);
   field->soldiers = NULL;
   field->soldiers_count = 0;

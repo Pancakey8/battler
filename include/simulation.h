@@ -4,8 +4,9 @@
 
 float angle_norm(float angle);
 
-typedef struct {
+typedef struct _soldier {
   int health, max_health;
+  bool is_dead;
   int damage;
   float attack_cooldown;
   float attack_clock;
@@ -15,20 +16,20 @@ typedef struct {
   float vision_angle;
   float vision_range;
   float range;
+  struct _soldier *target;
 } Soldier;
 
-Soldier soldier_new(float x, float y, float facing);
+Soldier *soldier_new(float x, float y, float facing);
 bool in_soldier_attack_cone(const Soldier *soldier, float x, float y);
-void soldier_approach_target(Soldier *soldier, const Soldier *target,
-                             double delta);
+void soldier_free(Soldier *soldier);
 
 typedef struct {
-  Soldier *soldiers;
+  Soldier **soldiers;
   size_t soldiers_count;
   size_t soldiers_size;
 } Warfield;
 
 Warfield warfield_new(void);
-void warfield_append_soldier(Warfield *field, Soldier soldier);
+void warfield_append_soldier(Warfield *field, Soldier *soldier);
 void warfield_run_tick(Warfield *field, double delta);
 void warfield_free(Warfield *field);
