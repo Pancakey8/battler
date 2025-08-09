@@ -105,6 +105,7 @@ void warfield_run_tick(Warfield *field, double delta) {
       if (dist <= field->soldiers[i].vision_range) {
         soldier_approach_target(&field->soldiers[i], &field->soldiers[j],
                                 delta);
+        break;
       }
     }
   }

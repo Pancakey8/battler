@@ -5,12 +5,17 @@
 typedef struct {
   float x, y;
   float speed;
+  float zoom;
 } Camera;
 
 Camera camera_new(float x, float y);
 void camera_displace(Camera *camera, float x, float y);
 float worldx(const Camera *camera, float x);
 float worldy(const Camera *camera, float y);
+float worldlen(const Camera *camera, float w);
+float gamex(const Camera *camera, float x);
+float gamey(const Camera *camera, float y);
+float gamelen(const Camera *camera, float w);
 
 typedef struct {
   Warfield field;
