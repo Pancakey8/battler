@@ -13,7 +13,7 @@ float angle_norm(float angle) {
   return angle;
 }
 
-Soldier *soldier_new(float x, float y, float facing) {
+Soldier *soldier_new(float x, float y, float facing, int team) {
   Soldier *sold = malloc(sizeof(Soldier));
   *sold = (Soldier){.health = 100,
                     .max_health = 100,
@@ -28,7 +28,8 @@ Soldier *soldier_new(float x, float y, float facing) {
                     .vision_angle = M_PI_4,
                     .vision_range = 600.0,
                     .range = 200.0,
-                    .target = NULL};
+                    .target = NULL,
+                    .team = team};
   return sold;
 }
 
@@ -124,6 +125,8 @@ void warfield_run_tick(Warfield *field, double delta) {
       float min_dist = FLT_MAX;
       for (size_t j = 0; j < field->soldiers_count; ++j) {
         if (i == j || field->soldiers[j]->is_dead)
+          continue;
+        if (field->soldiers[i]->team == field->soldiers[j]->team)
           continue;
         float dx = field->soldiers[j]->x - field->soldiers[i]->x,
               dy = field->soldiers[j]->y - field->soldiers[i]->y;

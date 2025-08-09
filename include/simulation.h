@@ -17,9 +17,10 @@ typedef struct _soldier {
   float vision_range;
   float range;
   struct _soldier *target;
+  int team;
 } Soldier;
 
-Soldier *soldier_new(float x, float y, float facing);
+Soldier *soldier_new(float x, float y, float facing, int team);
 bool in_soldier_attack_cone(const Soldier *soldier, float x, float y);
 void soldier_free(Soldier *soldier);
 

@@ -99,7 +99,11 @@ void render_soldier(const RenderTarget *target, const Soldier *sold,
   float tlx = worldx(&state->camera, sold->x - (float)rectsize / 2),
         tly = worldy(&state->camera, sold->y - (float)rectsize / 2);
   SDL_FRect rect = {.x = tlx, .y = tly, .w = rectsize, .h = rectsize};
-  SDL_SetRenderDrawColor(target->rdr, 0xFF, 0x00, 0x00, SDL_ALPHA_OPAQUE);
+  if (sold->team == 0) {
+    SDL_SetRenderDrawColor(target->rdr, 0xFF, 0x00, 0x00, SDL_ALPHA_OPAQUE);
+  } else {
+    SDL_SetRenderDrawColor(target->rdr, 0x00, 0xFF, 0x00, SDL_ALPHA_OPAQUE);
+  }
   SDL_RenderFillRect(target->rdr, &rect);
 
   // Attacked 0, charged 1
@@ -150,7 +154,11 @@ void renderer_events(const RenderTarget *target, const SDL_Event *event,
   case SDL_EVENT_MOUSE_BUTTON_DOWN: {
     if (event->button.button == SDL_BUTTON_LEFT) {
       Soldier *sold = soldier_new(gamex(&state->camera, event->button.x),
-                                  gamey(&state->camera, event->button.y), 0);
+                                  gamey(&state->camera, event->button.y), 0, 0);
+      warfield_append_soldier(&state->field, sold);
+    } else if (event->button.button == SDL_BUTTON_RIGHT) {
+      Soldier *sold = soldier_new(gamex(&state->camera, event->button.x),
+                                  gamey(&state->camera, event->button.y), 0, 1);
       warfield_append_soldier(&state->field, sold);
     }
     break;
