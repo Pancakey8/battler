@@ -76,7 +76,10 @@ void soldier_chase_target(Soldier *soldier, double delta) {
 Warfield warfield_new(void) {
   return (Warfield){.soldiers = calloc(50, sizeof(Soldier *)),
                     .soldiers_count = 0,
-                    .soldiers_size = 50};
+                    .soldiers_size = 50,
+                    .spawn_queue_count = 0,
+                    .spawn_queue_size = 20,
+                    .spawn_queue = calloc(20, sizeof(Soldier *))};
 }
 
 void warfield_resize(Warfield *field, size_t N) {
@@ -91,28 +94,18 @@ void warfield_resize(Warfield *field, size_t N) {
 }
 
 void warfield_append_soldier(Warfield *field, Soldier *soldier) {
-  for (size_t i = 0; i < field->soldiers_count; ++i) {
-    if (field->soldiers[i]->is_dead) {
-      soldier_free(field->soldiers[i]);
-      field->soldiers[i] = soldier;
-      return;
-    }
+  if (field->spawn_queue_count == field->spawn_queue_size) {
+    field->spawn_queue_size += 20;
+    field->spawn_queue = realloc(field->spawn_queue,
+                                 field->spawn_queue_size * sizeof(Soldier *));
   }
-
-  if (field->soldiers_count == field->soldiers_size) {
-    warfield_resize(field, field->soldiers_size + 50);
-  }
-
-  field->soldiers_count += 1;
-  field->soldiers[field->soldiers_count - 1] = soldier;
+  field->spawn_queue_count += 1;
+  field->spawn_queue[field->spawn_queue_count - 1] = soldier;
 }
 
 void warfield_run_tick(Warfield *field, double delta) {
   for (size_t i = 0; i < field->soldiers_count; ++i) {
     if (field->soldiers[i]->is_dead) {
-      continue;
-    } else if (field->soldiers[i]->health <= 0) {
-      field->soldiers[i]->is_dead = true;
       continue;
     }
 
@@ -140,6 +133,49 @@ void warfield_run_tick(Warfield *field, double delta) {
       soldier_chase_target(field->soldiers[i], delta);
     }
   }
+
+  warfield_spawn(field);
+
+  for (size_t i = 0; i < field->soldiers_count; ++i) {
+    if (field->soldiers[i]->health <= 0) {
+      field->soldiers[i]->is_dead = true;
+    }
+  }
+}
+
+void warfield_spawn(Warfield *field) {
+  size_t count = field->soldiers_count + field->spawn_queue_count;
+  if (count >= field->soldiers_size) {
+    field->soldiers_size = count + 20;
+    field->soldiers =
+        realloc(field->soldiers, field->soldiers_size * sizeof(Soldier *));
+  }
+
+  Soldier **queue_cursor = field->spawn_queue;
+  Soldier **queue_end = field->spawn_queue + field->spawn_queue_count;
+  for (size_t i = 0; i < field->soldiers_count; ++i) {
+    if (field->soldiers[i]->is_dead) {
+      soldier_free(field->soldiers[i]);
+      field->soldiers[i] = *queue_cursor;
+      queue_cursor += 1;
+    }
+    if (queue_cursor >= queue_end)
+      break;
+  }
+
+  int i = 0;
+  while (queue_cursor < queue_end) {
+    field->soldiers[field->soldiers_count + i] = *queue_cursor;
+    queue_cursor += 1;
+    i += 1;
+  }
+
+  field->soldiers_count += i;
+
+  field->spawn_queue_count = 0;
+  field->spawn_queue_size = 20;
+  free(field->spawn_queue);
+  field->spawn_queue = calloc(field->spawn_queue_size, sizeof(Soldier *));
 }
 
 void warfield_free(Warfield *field) {
@@ -150,4 +186,12 @@ void warfield_free(Warfield *field) {
   field->soldiers = NULL;
   field->soldiers_count = 0;
   field->soldiers_size = 0;
+
+  for (size_t i = 0; i < field->spawn_queue_count; ++i) {
+    soldier_free(field->spawn_queue[i]);
+  }
+  free(field->spawn_queue);
+  field->spawn_queue = NULL;
+  field->spawn_queue_count = 0;
+  field->spawn_queue_size = 0;
 }

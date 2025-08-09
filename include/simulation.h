@@ -28,9 +28,13 @@ typedef struct {
   Soldier **soldiers;
   size_t soldiers_count;
   size_t soldiers_size;
+  Soldier **spawn_queue;
+  size_t spawn_queue_count;
+  size_t spawn_queue_size;
 } Warfield;
 
 Warfield warfield_new(void);
 void warfield_append_soldier(Warfield *field, Soldier *soldier);
+void warfield_spawn(Warfield *field);
 void warfield_run_tick(Warfield *field, double delta);
 void warfield_free(Warfield *field);
